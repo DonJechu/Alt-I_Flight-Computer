@@ -29,6 +29,8 @@
 **Date:** June 1, 2026 — Veracruz, México  
 **Launch site:** Open field — pressure estimated, no gauge available
 
+![Atl-1 on launch pad](media/Prototype%20Gallery/atl1_rocket_on_pad.jpg)
+
 | Metric | Value |
 |---|---|
 | Apogee (barometric) | ~14 m |
@@ -42,7 +44,9 @@
 
 **Raw flight data:** [`data/flights/atl1_flight_20260601.csv`](data/flights/atl1_flight_20260601.csv)
 
-![Flight Data](media/atl1_flight_20260601_graphics.png)
+![Flight Data](media/Prototype%20Gallery/atl1_flight1_analysis.png)
+![Atl-1 in flight](media/Prototype%20Gallery/atl1_flight_vid.gif)
+
 
 ---
 
