@@ -78,7 +78,7 @@ Metrics: IMU RMS noise · I²C packet loss rate · barometric altitude drift · 
 | Barometer | BMP280 (0x76) | Hardware IIR FILTER_X16 enabled |
 | Power Boost | MT3608 DC-DC step-up | LiPo 3.7V → 5V |
 | Battery Charger | HW-373 (TP4056 + DW01) | USB-C charging with simultaneous load support |
-| Battery | LiPo 1S — 3.7V / 600–700 mAh | Minimum flight voltage: 3.0V |
+| Battery | LiPo 1S — 3.7V / 1200 mAh | Minimum flight voltage: 3.0V |
 | Actuator | Servo SG90 (GPIO 13) | Parachute deployment |
 | Switch | SPDT (GPIO 10) | Master power |
 | Buzzer | Piezoelectric active (GPIO 3) | State audio feedback |
