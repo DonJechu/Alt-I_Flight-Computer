@@ -3,7 +3,7 @@
 > Avionics system for experimental water-powered rockets.
 > Real-time telemetry · Triple-redundant apogee detection · Wi-Fi ground station · 7-state flight FSM · Onboard LittleFS black-box logging
 
-[![Status](https://img.shields.io/badge/status-First%20Flight%20Complete-brightgreen)](https://github.com/DonJechu/HydroRocket-Telemetry-System)
+[![Status](https://img.shields.io/badge/status-First%20Flight%20Complete-brightgreen)](https://github.com/DonJechu/Atl-I_Flight-Computer)
 [![Platform](https://img.shields.io/badge/platform-ESP32--C3-blue)](https://www.espressif.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Research](https://img.shields.io/badge/research-EMI%20Mitigation%20%2F%20Avionics-purple)](docs/research/)
