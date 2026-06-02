@@ -1,67 +1,94 @@
-# 🚀 Atl-I Flight Computer — v2.0
+# 🚀 Atl-1 Flight Computer — v2.1
 
 > **Avionics system for experimental water-powered rockets.**
-> Real-time telemetry · Triple-redundant apogee detection · Wi-Fi ground station · 7-state flight FSM
+> Real-time telemetry · Triple-redundant apogee detection · Wi-Fi ground station · 7-state flight FSM · Onboard LittleFS black-box logging
 
-[![Status](https://img.shields.io/badge/status-Flight%20Testing-orange)](https://github.com/DonJechu/HydroRocket-Telemetry-System)
-[![Platform](https://img.shields.io/badge/platform-ESP32-blue)](https://www.espressif.com/)
+[![Status](https://img.shields.io/badge/status-First%20Flight%20Complete-brightgreen)](https://github.com/DonJechu/HydroRocket-Telemetry-System)
+[![Platform](https://img.shields.io/badge/platform-ESP32--C3-blue)](https://www.espressif.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Research](https://img.shields.io/badge/research-EMI%20%2F%20Poynting%20Vector-purple)](docs/research/)
+[![Research](https://img.shields.io/badge/research-EMI%20Mitigation%20%2F%20Avionics-purple)](docs/research/)
 
 ---
 
 ## 📋 Table of Contents
 
 1. [Project Overview](#project-overview)
-2. [Research Context](#research-context)
-3. [Hardware Architecture](#hardware-architecture)
-4. [Avionics Bay — Design Evolution](#avionics-bay--design-evolution)
-5. [Firmware — Flight State Machine](#firmware--flight-state-machine)
-6. [Sensor Processing & Filters](#sensor-processing--filters)
-7. [Telemetry System](#telemetry-system)
-8. [Repository Structure](#repository-structure)
-9. [Build & Flash](#build--flash)
-10. [Known Issues & v4 Integration Status](#known-issues--v4-integration-status)
+2. [Flight Results — Atl-1](#flight-results--atl-1)
+3. [Research Context](#research-context)
+4. [Hardware Architecture](#hardware-architecture)
+5. [Avionics Bay — Design Evolution](#avionics-bay--design-evolution)
+6. [Firmware — Flight State Machine](#firmware--flight-state-machine)
+7. [Sensor Processing & Filters](#sensor-processing--filters)
+8. [Onboard Data Logging — LittleFS](#onboard-data-logging--littlefs)
+9. [Telemetry System](#telemetry-system)
+10. [Repository Structure](#repository-structure)
+11. [Build & Flash](#build--flash)
+12. [Known Issues & Roadmap](#known-issues--roadmap)
 
 ---
 
 ## Project Overview
 
-**HYDRO-1** is a flight computer designed for water-powered PET bottle rockets. It is the hardware platform for ongoing research into **EMI mitigation in aerospace wiring harnesses**, using the Poynting Vector framework to validate field-based signal integrity strategies in a real high-vibration environment.
+**Atl-1** is a flight computer designed for water-powered PET bottle rockets. It is the hardware validation platform for ongoing research into **EMI mitigation in compact low-cost avionics**, comparing shielded vs. unshielded wiring configurations under real flight conditions.
 
 The system provides:
 - **Real-time telemetry** over Wi-Fi WebSocket at 10 Hz
 - **Triple-redundant apogee detection** (velocity zero-crossing + altitude drop + safety timeout)
 - **Hardware IIR pressure filtering** on BMP280 to suppress aerodynamic transients
 - **Parachute deployment** via servo at confirmed apogee
+- **Onboard black-box logging** to flash memory via LittleFS — survives WiFi loss
 
-> 🚀 **Status:** First flight scheduled — April 28, 2026. Integration complete. Ground testing passed. This repository documents the complete design process including failures, iterations, and corrections — which is the engineering record.
+> ✅ **Status:** First instrumented flight completed — **June 1, 2026, Veracruz, Mexico.**
+> Apogee: ~14m. Onboard CSV recovered via Serial after landing. See [Flight Results](#flight-results--atl-1).
+
+---
+
+## Flight Results — Atl-1
+
+**Date:** June 1, 2026 — Veracruz, México
+**Launch site:** Open field — no pressure gauge available, pressure estimated
+
+| Metric | Value |
+|---|---|
+| **Apogee (barometric)** | ~14 m |
+| **Peak velocity** | ~4.5 m/s |
+| **Peak G-Force (liftoff)** | ~1.6 G |
+| **Flight duration** | ~30 s |
+| **Parachute deployment** | ❌ Not triggered — see note |
+| **LittleFS data recovery** | ✅ CSV recovered via Serial DUMP post-landing |
+
+> **Note on parachute:** The FSM `LIFTOFF_G` threshold was set to 2.5G. The rocket only produced 1.6G at liftoff due to low pressurization (no gauge). The FSM remained in STANDBY throughout the flight. **Fix for Atl-2:** lower threshold to 1.2G.
+
+**Raw flight data:** [`data/flights/atl1_flight_20260601.csv`](data/flights/atl1_flight_20260601.csv)
+
+![Flight Data](media/atl1_flight_20260601_graphics.png)
 
 ---
 
 ## Research Context
 
-This project serves as the experimental platform for ongoing research on EMI mitigation in aerospace wiring harnesses, using a field-theoretic approach (Poynting Vector framework). Research paper in preparation — to be submitted to IEEE
+This project is the experimental platform for a paper on **EMI mitigation strategies in compact low-cost avionics**, to be submitted to IEEE Latin America Transactions.
 
-### Core Thesis
+### Hypothesis
 
-Classical intuition treats wires as "pipes" for energy. This is incorrect. The actual energy carrier is the electromagnetic field surrounding the conductor, described by the **Poynting Vector**:
+> *"EMI mitigation techniques (twisted pairs, star ground, LC filtering, spatial separation) significantly reduce I²C sensor degradation in compact ESP32-based avionics."*
 
-$$\mathbf{S} = \frac{1}{\mu_0}(\mathbf{E} \times \mathbf{B}) \quad \left[\frac{\text{W}}{\text{m}^2}\right]$$
+The experiment compares two wiring configurations on a static bench:
 
-Electrons drift at mere millimeters per second — governed by the **Drude model**:
+| Config A — Unmitigated | Config B — Mitigated |
+|---|---|
+| Parallel untwisted cables | Twisted pairs on all signal lines |
+| Daisy-chain ground | Star ground |
+| No LC filter on MT3608 | LC filter (47µH + 100µF) post-boost converter |
+| No decoupling | 100nF + 10µF per sensor node |
 
-$$v_d = \frac{I}{nqA}$$
+Metrics measured: IMU RMS noise, I²C packet loss rate, barometric altitude drift, servo EMI events.
 
-while energy propagates at near light speed through the *external* field. This has direct consequences for EMI: **crosstalk is not a wire problem, it is a field geometry problem.**
+> **Important framing:** This paper documents an *experimental implementation* of field-theoretic EMI mitigation principles in a real avionics platform. Claims are limited to measured deltas between configurations — not theoretical validation of electromagnetic models.
 
-### Why this rocket?
+### Why a water rocket?
 
-The HYDRO-1 wiring harness is intentionally designed in two configurations:
-1. Unshielded parallel runs (power + signal lines adjacent) — baseline EMI scenario
-2. Twisted pair + separated routing — field-confined scenario
-
-In-flight telemetry data will be compared between configurations to measure real crosstalk impact on sensor fidelity under high-vibration, high-EMI conditions (motor PWM, servo switching, Wi-Fi RF).
+The Atl-1 wiring harness operates under real constraints: motor switching transients, servo PWM, active WiFi RF at 2.4 GHz, and mechanical vibration. This makes it a representative — and reproducible — low-cost testbed for avionics signal integrity experiments.
 
 ---
 
@@ -71,39 +98,44 @@ In-flight telemetry data will be compared between configurations to measure real
 
 | Component | Part | Role |
 |---|---|---|
-| **Microcontroller** | ESP32-DEVKIT-V1 (30-pin) | Main processor, Wi-Fi AP, WebSocket server |
-| **IMU** | MPU-6050 compatible module | 9-axis IMU — note: physical chip is newer variant, library-compatible — configured for ±16G |
-| **Barometer** | BMP280 | Altitude via pressure — hardware IIR filter enabled |
-| **Power Regulation** | MT3608 Boost Converter | 3.7V LiPo → 5V regulated for ESP32 VIN |
-| **Decoupling** | 100µF electrolytic + 100nF ceramic | MT3608 output bulk filter + IMU VCC bypass |
-| **Battery** | LiPo 103040 — 3.7V / 1200mAh / 4.44Wh | Flight power supply |
-| **Actuator** | Standard servo (GPIO 13) | Parachute deployment mechanism |
+| **Microcontroller** | ESP32-C3 Super Mini (USB-C) | Main processor, Wi-Fi AP, WebSocket server |
+| **IMU** | GY-521 module — physical chip: **MPU-6500** (WHO_AM_I = 0x70) | 6-axis IMU — configured ±16G / ±2000°/s |
+| **Barometer** | BMP280 (0x76) | Altitude via pressure — hardware IIR FILTER_X16 enabled |
+| **Power Boost** | MT3608 DC-DC step-up | LiPo 3.7V → 5V regulated |
+| **Battery Charger** | HW-373 (TP4056 + DW01 protection) | USB-C LiPo charging with simultaneous load support |
+| **Battery** | LiPo 1S — 3.7V / 600–700 mAh | Flight power supply |
+| **Actuator** | Servo SG90 (GPIO 2) | Parachute deployment |
+| **Switch** | SPDT (GPIO 10) | Master power ON/OFF |
+| **Buzzer** | Piezoelectric active (GPIO 3) | State audio feedback |
+
+> **IMU library note:** The GY-521 module on this build contains an **MPU-6500**, not an MPU-6050. The Adafruit MPU6050 library requires a one-line patch in `Adafruit_MPU6050.cpp` to accept WHO_AM_I = 0x70. See [Build & Flash](#build--flash).
 
 ### I²C Bus
 
-Both MPU-6050 and BMP280 share the I²C bus:
+| Signal | ESP32-C3 Pin | Device |
+|---|---|---|
+| SDA | GPIO 21 | MPU-6500, BMP280 |
+| SCL | GPIO 22 | MPU-6500, BMP280 |
+| — | 0x68 | MPU-6500 I²C address |
+| — | 0x76 | BMP280 I²C address |
 
-| Signal | ESP32 Pin |
-|---|---|
-| SDA | GPIO 21 |
-| SCL | GPIO 22 |
-| MPU-6050 Address | 0x68 |
-| BMP280 Address | 0x76 |
+Pull-ups: 5.1 kΩ from SDA → 3V3 and SCL → 3V3.
 
 ### Power Path
 
 ```
-LiPo 3.7V ──► MT3608 Boost ──► 5V ──► ESP32 VIN ──► 3.3V LDO ──► Sensors
-                (adj. to 5V)
+USB-C ──► HW-373 IN+ ──► [charges] ──► LiPo 3.7V ──► MT3608 ──► 5V ──► ESP32-C3
+          HW-373 OUT+ ─────────────────────────────────────┘
+                                               └──► 3.3V LDO ──► Sensors
 ```
 
-> **Schematic:** See [`hardware/Schematic_HidroRocket_v0_2026-04-26.pdf`](hardware/Schematic_HidroRocket_v0_2026-04-26.pdf)
+> On landing detection, WiFi is disabled in firmware to reduce idle current from ~180mA to ~20mA.
 
 ---
 
 ## Avionics Bay — Design Evolution
 
-The avionics bay has gone through three major design iterations. Each failure was documented and fed directly into the next version. This is the engineering record.
+The avionics bay has gone through four major design iterations. Each failure was documented and fed directly into the next version. This is the engineering record.
 
 ### Version Comparison
 
@@ -111,7 +143,7 @@ The avionics bay has gone through three major design iterations. Each failure wa
 |---|---|---|---|---|
 | **Height** | 118.5 mm | 118 mm | 102 mm | TBD |
 | **Base OD** | 52 mm | 81 mm | 80.9 mm | TBD |
-| **Printed Mass** | 33.01 g | 66.62 g | 46.22 g | 25.63 |
+| **Printed Mass** | 33.01 g | 66.62 g | 46.22 g | 25.63 g |
 | **Pieces** | 1 | 2 | 2 | 1 |
 | **PCB mount** | Screwed direct | Slide rail | Slide rail (revised) | TBD |
 | **Battery space** | None | Insufficient | In revision | TBD |
@@ -124,61 +156,67 @@ The avionics bay has gone through three major design iterations. Each failure wa
 ---
 
 ### v1 — Structural Baseline
- 
+
 **Goal:** Minimum viable bay. One-piece design, direct PCB mount.
- 
+
 **Result — Failed integration:**
 - PCB mounting nuts and standoff contractions caused mechanical interference; the board could not be seated flush
 - No dedicated battery compartment — LiPo placement undefined
 - Ring dimensions incorrect: OD too small to fit inside a 1.35L Coca-Cola PET bottle (~85mm ID required)
 - Single-piece design meant any revision required reprinting the entire part
+
 **Mass:** 33.01 g | **Height:** 118.5 mm | **OD:** 52 mm
- 
+
 ![AvionicsBay v1 Render](media/Prototype%20Gallery/AvionicsBay_v1_render.png)
- 
+
 ---
- 
+
 ### v2 — Rail System
- 
+
 **Goal:** Solve PCB access problem. Introduce modularity.
- 
+
 **Key change:** Split into two parts — a structural sled that mounts to the bottle, and a PCB carrier plate that slides into a rail. This means PCB changes only require reprinting the carrier plate, not the full bay.
- 
+
 **Result — Too heavy:**
 - Rail + structural shell geometry increased mass to 66.62 g (+100% vs v1)
-- Battery space still insufficient for 103040 LiPo cell (30×40×10 mm)
+- Battery space still insufficient for LiPo cell
 - OD corrected but not validated against physical bottle measurement
+
 **Mass:** 66.62 g | **Height:** 118 mm | **OD:** 81 mm
- 
+
 ![AvionicsBay v2 Render](media/Prototype%20Gallery/AvionicsBay_v2_render.png)
- 
+
 ---
- 
-### v3 — Mass-Optimized Honeycomb (Current Alpha)
- 
+
+### v3 — Mass-Optimized Honeycomb
+
 **Goal:** Reduce mass below 40g while keeping v2's rail modularity. Introduce honeycomb infill geometry on the main panel.
- 
+
 **Key changes:**
 - Reduced height by 16 mm (102 mm total)
 - Honeycomb cutout pattern on main structural panel (mass reduction + ventilation)
 - Maintained two-piece rail system from v2
+
 **Failures documented (v3.0 Alpha):**
 1. **Mechanical:** Nut/standoff interference on PCB mount — same root cause as v1, not fully resolved
-2. **Volumetric:** Battery compartment still does not accommodate LiPo 103040 (30×40×10 mm) + cable routing (minimum 5–8 mm egress space required)
-3. **Geometric:** OD not validated against physical bottle. Nominal 80.9 mm but actual 1.35L bottle ID varies 84–87 mm by batch — must be measured with calipers before fixing in CAD
-4. **Structural:** Print fracture during support removal on thin-wall sections (<2 mm) with Tree support configuration on Bambu Lab P2S
+2. **Volumetric:** Battery compartment still does not accommodate LiPo + cable routing
+3. **Geometric:** OD not validated against physical bottle. Nominal 80.9 mm but actual 1.35L bottle ID varies 84–87 mm by batch
+4. **Structural:** Print fracture during support removal on thin-wall sections (<2 mm)
+
 **Mass:** 46.22 g | **Height:** 102 mm | **OD:** 80.9 mm
- 
+
 ![AvionicsBay v3 Render](media/Prototype%20Gallery/AvionicsBay_v3_render.png)
 
- ### v4 — Single-Piece Truss Architecture (Current)
+---
+
+### v4 — Single-Piece Truss Architecture (Current)
 
 **Goal:** Eliminate over-engineering. Return to single-piece design with truss/celosía geometry for maximum mass reduction while maintaining structural integrity.
 
 **Key changes:**
 - Single-piece design — removes rail interface, assembly complexity, and inter-part tolerance issues
 - Truss skeleton replaces solid honeycomb panel — material only where structurally necessary
-- Estimated model mass: 23.92 g (slicer, no supports) — best result across all versions
+- Estimated model mass: 25.63 g (slicer, no supports) — best result across all versions
 
 **Print history:**
 - `ABv4.0` — Failed. Top Z distance 0mm caused supports to fuse to structure. Removed with damage.
@@ -186,24 +224,24 @@ The avionics bay has gone through three major design iterations. Each failure wa
 
 **Design rationale:** Previous versions (v2, v3) introduced modularity to solve PCB access — but added mass and complexity. v4 returns to v1's simplicity with v3's mass consciousness. Less is more.
 
-**Integration status:** PCB assembly fits inside 1.35L bottle. ✅ Pending: secure mounting method and mass measurement.
+**Integration status:** PCB assembly fits inside 1.35L bottle. ✅
 
 ![AvionicsBay v4 Render](media/Prototype%20Gallery/AvionicsBay_v4_render.png)
 
 ### PCB — Physical Assembly
- 
+
 | Bare board (v1 iteration) | Full assembly with ESP32 + sensors |
 |---|---|
 | ![PCB bare](media/Prototype%20Gallery/PCB_v1_bare_assembly.jpg) | ![PCB full](media/Prototype%20Gallery/PCB_v2_full_assembly.jpg) |
- 
+
 ---
 
 ## Firmware — Flight State Machine
 
-The flight computer implements a 7-state finite state machine. States `ARMED` and `IGNITION` are defined in the enum for future remote-arming via the ground station dashboard but are not yet active in the switch logic.
+The flight computer implements a 7-state FSM. States `ARMED` and `IGNITION` are defined for future remote-arming via the ground station.
 
 ```
-                    gForce ≥ 2.5G
+                    gForce ≥ 1.2G *
                    (4 consecutive)
   ┌──────────┐ ─────────────────────► ┌──────────┐
   │ STANDBY  │                        │  ASCENT  │
@@ -229,178 +267,191 @@ The flight computer implements a 7-state finite state machine. States `ARMED` an
                                            │
                                            ▼
                                       ┌──────────┐
-                                      │ LANDING  │
+                                      │ LANDING  │  WiFi OFF · log closed
                                       └──────────┘
 ```
+
+> \* **Atl-1 flight data showed peak liftoff G = 1.6G at low pressure.** `LIFTOFF_G` was corrected from 2.5G to 1.2G for Atl-2.
 
 ### State Descriptions
 
 | State | ID | Entry Condition | Action |
 |---|---|---|---|
-| `STANDBY` | 0 | Boot | Transmit telemetry, wait for liftoff |
-| `ARMED` | 1 | *(future: ground station command)* | Arm pyro / deployment circuit |
-| `IGNITION` | 2 | *(future: remote trigger)* | Log ignition timestamp |
-| `ASCENT` | 3 | gForce ≥ 2.5G × 4 samples | Track maxAltitude, evaluate apogee |
-| `APOGEE` | 4 | Triple-redundant (see below) | `servo.write(90)` — deploy parachute |
-| `DESCENT` | 5 | Post-apogee | Monitor altitude, transmit |
-| `LANDING` | 6 | altitude < 0.75 m | Stop flight log (LittleFS — pending) |
-
-### Triple-Redundant Apogee Detection
-
-Apogee is the most safety-critical event. Three independent methods must confirm it:
-
-**Method 1 — Velocity Zero-Crossing (Primary)**
-
-The most reliable indicator from rocketry literature. When vertical velocity transitions from positive to zero or negative:
-
-$$v(t) = v(t-1) \cdot 0.85 + \frac{\Delta h}{\Delta t} \cdot 0.15 \leq 0 \quad \text{(5 consecutive samples)}$$
-
-**Method 2 — Altitude Drop (Backup)**
-
-If the filtered altitude falls more than 1.0 m below the recorded maximum:
-
-$$h_{current} < h_{max} - \Delta h_{apogee} \quad (\Delta h_{apogee} = 1.0\text{ m}, \; 4 \text{ confirmations})$$
-
-**Method 3 — Absolute Timeout (Safety)**
-
-If neither primary nor backup triggers within 12 seconds of liftoff confirmation, the parachute deploys unconditionally. This prevents the rocket from impacting the ground without a deployed chute in case of sensor failure.
+| `STANDBY` | 0 | Boot | Transmit telemetry, log to flash, wait for liftoff |
+| `ARMED` | 1 | *(future)* | — |
+| `IGNITION` | 2 | *(future)* | — |
+| `ASCENT` | 3 | gForce ≥ 1.2G × 4 samples | Track maxAltitude, evaluate apogee |
+| `APOGEE` | 4 | Triple-redundant | `servo.write(90)` — deploy parachute |
+| `DESCENT` | 5 | Post-apogee | Monitor altitude, transmit, log |
+| `LANDING` | 6 | altitude < 0.75 m | Close LittleFS log · disable WiFi |
 
 ---
 
 ## Sensor Processing & Filters
 
-### BMP280 — Dual IIR Filtering
-
-Aerodynamic turbulence creates pressure transients that corrupt altitude readings. The BMP280 includes a hardware IIR filter that is enabled at maximum coefficient:
+### BMP280 — Dual IIR Filtering + Ground Calibration
 
 ```cpp
 bmp.setSampling(
   MODE_NORMAL,
-  SAMPLING_X2,   // Temperature oversampling
-  SAMPLING_X16,  // Pressure oversampling — maximum resolution
+  SAMPLING_X2,   // Temperature
+  SAMPLING_X16,  // Pressure — maximum resolution
   FILTER_X16,    // Hardware IIR — maximum smoothing
-  STANDBY_MS_1   // ~27 ms update rate
+  STANDBY_MS_1   // ~28 Hz update rate
 );
 ```
 
-A second software IIR filter is applied in the main loop:
+Software IIR (α = 0.8 for flight responsiveness):
 
-$$h_{filtered}[n] = \alpha \cdot h_{filtered}[n-1] + (1-\alpha) \cdot h_{raw}[n]$$
+$$h_{filtered}[n] = 0.8 \cdot h_{filtered}[n-1] + 0.2 \cdot h_{raw}[n]$$
 
-With $\alpha = 0.8$ for flight (responsive to 15–20 m/s dynamics). Note: this will appear noisy in static indoor testing — that is the correct and expected behavior.
+**Calibration sequence at boot (2.6 seconds total):**
 
-### Pressure Calibration
+1. **Warm-up — 100 reads discarded:** IIR FILTER_X16 requires ~70 samples to converge from an unknown initial state. Early readings are biased and must be discarded.
+2. **Base pressure — average of reads 101–200:** With IIR settled, 100 samples are averaged for `basePressure`.
+3. **Ground offset — 50 samples:** `bmp.readAltitude(basePressure)` is averaged to establish the absolute zero reference. Compensates for any residual IIR offset.
 
-At boot, 300 pressure samples are averaged over ~3 seconds to establish a local ground-level reference:
-
-$$P_{base} = \frac{1}{300}\sum_{i=1}^{300} P_i$$
-
-This must be performed with the rocket stationary on the launch pad.
-
-### MPU-6050 — G-Force & Orientation
-
-The IMU is configured for the high-G environment of a water rocket launch:
-
-```cpp
-mpu.setAccRange(MPU9250_ACC_RANGE_16G);   // ±16G
-mpu.setGyrRange(MPU9250_GYRO_RANGE_2000); // ±2000°/s
+```
+rawAlt = bmp.readAltitude(basePressure) - groundAltitude
 ```
 
-G-force magnitude:
+> **Critical:** Calibration must be performed outdoors at the launch site with the rocket stationary and uncapped. Moving to a different pressure environment (indoors, different altitude) after calibration invalidates the zero reference.
 
-$$G = \sqrt{a_x^2 + a_y^2 + a_z^2}$$
+### MPU-6500 — G-Force & Orientation
 
-Euler angles (from raw accelerometer, no Kalman filter yet — planned for v3.1 firmware):
+Configured via Adafruit MPU6050 library (compatible after WHO_AM_I patch):
 
-$$\text{pitch} = \arctan\!\left(\frac{a_x}{\sqrt{a_y^2 + a_z^2}}\right) \cdot \frac{180°}{\pi}$$
+```cpp
+mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
+mpu.setGyroRange(MPU6050_RANGE_2000_DEG);
+mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+```
 
-$$\text{roll} = \arctan\!\left(\frac{a_y}{a_z}\right) \cdot \frac{180°}{\pi}$$
+Raw accelerometer values converted to G:
+
+```cpp
+float ax = a.acceleration.x / 9.81f;
+float ay = a.acceleration.y / 9.81f;
+float az = a.acceleration.z / 9.81f;
+gForce = sqrt(ax*ax + ay*ay + az*az);
+```
+
+---
+
+## Onboard Data Logging — LittleFS
+
+v2.1 adds persistent flash logging independent of WiFi connectivity. Flight data is preserved even if the ground station loses connection mid-flight.
+
+**Each boot creates a new file:** `/flight_1.csv`, `/flight_2.csv`, etc. (auto-increment, never overwrites).
+
+**Format:** same columns as WebSocket telemetry — directly compatible with ground station CSV export.
+
+**Capacity:** ~60 bytes/row × 10 Hz × 60s flight ≈ 36 KB per flight. ~1.5 MB available → ~40 flights before needing FORMAT.
+
+### Serial Recovery Commands
+
+Connect via USB at 115200 baud after landing:
+
+| Command | Action |
+|---|---|
+| `LIST` | List all files and sizes |
+| `DUMP` | Dump all CSV files to Serial |
+| `DUMP:flight_1.csv` | Dump specific file |
+| `FORMAT` | Erase all log files |
 
 ---
 
 ## Telemetry System
 
-The ESP32 creates a Wi-Fi Access Point (`SSID: GANNET`) and serves a WebSocket server on port 81. The ground station connects and receives JSON packets at 10 Hz:
+The ESP32-C3 creates a Wi-Fi Access Point and serves a WebSocket server on port 81 at 10 Hz:
 
 ```json
 {
-  "alt":      42.3,
-  "vel":      12.1,
-  "accel":    3.47,
-  "pitch":    -2.1,
-  "roll":     0.8,
-  "yaw":      0.0,
-  "temp":     28.4,
-  "pressure": 1009.2,
-  "phase":    3
+  "t": 72421,
+  "alt": 14.1,
+  "vel": 5.4,
+  "accel": 1.15,
+  "pitch": 68.0,
+  "roll": 147.5,
+  "yaw": 0.0,
+  "temp": 35.1,
+  "pressure": 997.4,
+  "phase": 0
 }
 ```
 
 | Field | Unit | Description |
 |---|---|---|
-| `alt` | m | Filtered altitude above launch point |
+| `t` | ms | Timestamp since boot |
+| `alt` | m | Filtered altitude above calibration point |
 | `vel` | m/s | Vertical velocity (positive = ascending) |
 | `accel` | G | Total acceleration magnitude |
 | `pitch` | ° | Nose-up/down angle |
 | `roll` | ° | Rotation around longitudinal axis |
 | `temp` | °C | Ambient temperature (BMP280) |
 | `pressure` | hPa | Absolute pressure |
-| `phase` | 0–6 | Current flight state ID |
+| `phase` | 0–6 | Current FSM state |
+
+> **Ground Station Repository:** [Atl_1-Ground-Station](https://github.com/DonJechu/HYDRO-1-Ground-Station)
 
 ---
 
 ## Ground Station — HYDRO-1 GS
- 
+
 The ground station is a separate React + Vite web application that connects to the flight computer over WebSocket and visualizes all telemetry in real time.
- 
+
 ![Ground Station Dashboard](media/Prototype%20Gallery/ground_station_v2.png)
- 
+
 ### Features
- 
+
 | Feature | Description |
 |---|---|
 | **3D Attitude View** | Real-time 3D rocket model that rotates with live pitch, roll, and yaw data |
 | **Flight Phase Tracker** | Left panel shows all 7 states (STANDBY → ARMED → IGNITION → ASCENT → APOGEE → DESCENT → RECOVERY), highlighting the active state |
 | **Live Telemetry Panel** | Right panel — altitude (m), velocity (m/s), G-force, pitch, roll, yaw, temperature (°C), pressure (hPa) |
 | **Session Records** | Tracks max altitude, max velocity, max G, and mission elapsed time (T+) |
-| **Altitude & Velocity Charts** | Real-time graphs at the bottom of the screen |
-| **WiFi Connect / Demo Mode** | Connect to the ESP32 AP or run a simulated flight for testing without hardware |
-| **Status Bar** | Persistent bottom bar showing pitch, roll, temperature, and pressure at a glance |
- 
+| **Altitude & Velocity Charts** | Real-time graphs updated at 10 Hz |
+| **WiFi Connect / Demo Mode** | Connect to the ESP32-C3 AP or run a simulated flight for testing without hardware |
+| **CSV Export** | Download full telemetry session as `.csv` — same format as LittleFS onboard log |
+
 ### Tech Stack
- 
+
 ```
 React + Vite        — UI framework (localhost:5173 in dev)
-WebSocket (port 81) — Real-time data stream from ESP32
+WebSocket (port 81) — Real-time data stream from ESP32-C3
 Three.js            — 3D rocket attitude visualization
 ```
- 
+
 ### Connection Flow
- 
+
 ```
-ESP32 (AP: GANNET) ──► WebSocket ws://192.168.4.1:81 ──► Ground Station
-                              10 Hz JSON packets
+ESP32-C3 (AP: ROCKET_AP) ──► WebSocket ws://192.168.4.1:81 ──► Ground Station
+                                    10 Hz JSON packets
 ```
 
- ![Ground Station Demo](media/Prototype%20Gallery/ground_station_demo.gif)
-> **Ground Station Repository:** [HYDRO-1-Ground-Station](https://github.com/DonJechu/HYDRO-1-Ground-Station)
->  
+![Ground Station Demo](media/Prototype%20Gallery/ground_station_demo.gif)
+
+> **Note:** Open only **one browser tab** at a time. Multiple connected WebSocket clients cause duplicate rows in the exported CSV.
+
 ---
 
 ## Repository Structure
 
 ```
-HydroRocket-Telemetry-System/
+Atl-Flight_Computer/
 ├── firmware/
-│   └── HydroRocket.ino          # Main flight computer firmware (v2.0)
+│   └── hidrorocket_v3.ino       # Flight computer firmware v2.1
+├── flights/
+│   └── atl1_flight_20260601.csv   # Atl-1 first flight — June 1, 2026
+│   └── graphics.py   # Atl Graphics generator
+├── analysis/
+│   └── graphics.py              # Flight data visualization
 ├── hardware/
-│   └── Schematic_HidroRocket_v0_2026-04-20.pdf
+│   └── Schematic_HidroRocket_v0_2026-04-26.pdf
 ├── mechanical/
-│   ├── AvionicsBay_v1 - Bay_Structure.stl
-│   ├── AvionicsBay_v1 - Sled.stl
-│   └── AvionicsBay_v1.step
+│   └── AvionicsBay_v4.stl
 ├── media/
-│   └── Prototype Gallery/       # Photos and renders
+│   └── atl1_flight_analysis.png   # Atl-1 graphics of first flight — June 1, 2026
 └── README.md
 ```
 
@@ -408,60 +459,81 @@ HydroRocket-Telemetry-System/
 
 ## Build & Flash
 
-### Dependencies (Arduino IDE / PlatformIO)
+### Dependencies (Arduino IDE)
 
 ```
-MPU9250_WE          by Wolfgang Ewald
-Adafruit BMP280     by Adafruit
-ESP32Servo          by Kevin Harrington
-WebSockets          by Markus Sattler
-WiFi                (ESP32 built-in)
+Adafruit MPU6050     by Adafruit        ← requires WHO_AM_I patch for MPU-6500
+Adafruit BMP280      by Adafruit
+Adafruit Sensor      by Adafruit        (dependency)
+ESP32Servo           by Kevin Harrington
+WebSockets           by Markus Sattler
+LittleFS             (ESP32 built-in)
+WiFi                 (ESP32 built-in)
+```
+
+### MPU-6500 Library Patch (required)
+
+The GY-521 module on this build contains an MPU-6500 (WHO_AM_I = 0x70). The Adafruit library rejects it by default. Apply this one-line fix:
+
+**File:** `Documents/Arduino/libraries/Adafruit_MPU6050/Adafruit_MPU6050.cpp` — line ~93
+
+```cpp
+// BEFORE:
+if (chip_id.read() != MPU6050_DEVICE_ID) {
+
+// AFTER:
+if (chip_id.read() != MPU6050_DEVICE_ID && chip_id.read() != 0x70) {
 ```
 
 ### Flash Steps
 
-1. Open `firmware/HydroRocket.ino` in Arduino IDE
-2. Select board: **ESP32 Dev Module**
-3. Select the correct COM port
-4. Upload
-5. Open Serial Monitor at **115200 baud**
-6. Wait for `=== READY FOR FLIGHT ===`
-7. Connect to Wi-Fi: `SSID: GANNET` / `Password: 1234`
-8. Open ground station on port 81
+1. Open `firmware/atl_flgiht-computer.ino` in Arduino IDE
+2. **Board:** `ESP32C3 Dev Module`
+3. **Partition Scheme:** `Default 4MB with spiffs (1.2MB App/OTA, 1.5MB SPIFFS)` ← required for LittleFS
+4. Select correct COM port
+5. Upload
+6. Open Serial Monitor at **115200 baud**
+7. Wait for calibration sequence (~2.6s) and `=== READY FOR FLIGHT ===`
+8. Connect to Wi-Fi: `SSID: Atl_FC` / `Password: 12345678`
 
 ### Pre-Launch Checklist
 
-- [ ] Battery charged (LiPo 103040, 3.7V nominal)
-- [ ] Rocket stationary on pad during 3-second pressure calibration
-- [ ] Serial monitor confirms `Base Pressure: ~1013 hPa` (±15 hPa acceptable)
-- [ ] Ground station WebSocket connected and receiving data
-- [ ] Servo verified at 0° (parachute closed)
-- [ ] `phase: 0` (STANDBY) confirmed on dashboard
+- [ ] Power on **outdoors at launch site**, rocket stationary and uncapped
+- [ ] Wait for `=== READY FOR FLIGHT ===` (2.6s calibration)
+- [ ] Ground offset printed: confirm within ±1.0 m
+- [ ] `LIST` via Serial → confirm new `/flight_N.csv` created
+- [ ] Ground station connected — altitude reads ±1 m
+- [ ] Only **one browser tab** open (duplicates cause double CSV rows)
+- [ ] Servo confirmed at 0° (parachute closed)
+- [ ] LiPo charged to 4.2V (HW-373 blue LED)
+- [ ] Cap and pressurize **after** READY confirmation
 
 ---
 
-## Known Issues & v4 Integration Status
+## Known Issues & Roadmap
 
-### Mechanical — v4 Targets
+### Resolved in v2.1
 
-| Item | Status |
+| Issue | Status |
 |---|---|
-| OD validation against physical bottle | ⚠️ Pending — measure with calipers post-print |
-| PCB mounting clearance | ⚠️ TBD — single piece, verify nut interference |
-| LiPo 103040 mounting | ⚠️ No dedicated compartment — open truss design requires external mounting solution |
-| Support removal on truss geometry | ✅ Resolved — Top Z 0.25mm, Normal supports, threshold 30° |
+| LittleFS black-box logging | ✅ Implemented |
+| BMP280 IIR warm-up before calibration | ✅ Fixed |
+| Ground altitude zero offset | ✅ Fixed |
+| MPU-6500 WHO_AM_I library rejection | ✅ Patched |
+| WiFi power drain post-landing | ✅ WiFi disabled on LANDING |
+| Double CSV rows (multiple WS clients) | ✅ Documented — use one tab |
 
-### Firmware — Planned
+### Pending — Atl-2
 
-- [ ] Kalman filter for pitch/roll (replace raw atan2)
-- [ ] LittleFS black-box data logging (close file on LANDING state)
-- [ ] `ARMED` / `IGNITION` state integration with React ground station
-- [ ] In-flight EMI measurement logging (crosstalk baseline vs. shielded config)
-
-### Research — Pending
-
-- [ ] Simscape MATLAB model: mutual inductance between power and signal traces
-- [ ] Experimental comparison: unshielded vs. twisted-pair wiring harness
+| Item | Priority |
+|---|---|
+| Lower `LIFTOFF_G` to 1.2f (flight data shows 1.6G peak at low pressure) | 🔴 High |
+| Verify CG/CP with electronics integrated in OpenRocket | 🔴 High |
+| Pressure gauge for launch (no more estimating) | 🔴 High |
+| Replace BMP280 → MS5611 (±0.1m vs ±8m resolution) | 🟡 Medium |
+| Kalman filter for pitch/roll (replace raw atan2) | 🟡 Medium |
+| `ARMED` / `IGNITION` state integration with ground station | 🟢 Low |
+| A/B EMI experiment on static bench (10 reps × 2 configs) | 📄 Paper |
 
 ---
 
@@ -469,7 +541,7 @@ WiFi                (ESP32 built-in)
 
 **Jesús Alberto Perea García**
 Mechatronics Engineering Student — IEST Anáhuac, Tamaulipas
-Member: IEEE Student Branch · Vértice Excellence Program
-[github.com/DonJechu](https://github.com/DonJechu) · jesus.perea@iest.edu.mx
+Founder — Vértice Labs Research Program
+[github.com/DonJechu](https://github.com/DonJechu)
 
-*This project is part of ongoing research on EMI in aerospace avionics systems under field-theoretic analysis (Poynting Vector framework). Mentored by Ing. Oscar (aerospace specialist).*
+*Atl-1 is the validation platform for experimental research on EMI mitigation in compact low-cost avionics. Paper in preparation for submission to IEEE Latin America Transactions.*
