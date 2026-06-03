@@ -40,7 +40,7 @@
 | Parachute deployment | ❌ Not triggered — see note |
 | LittleFS data recovery | ✅ CSV recovered via Serial DUMP post-landing |
 
-> **Note on parachute:** `LIFTOFF_G` was set to 2.5G. Actual peak was 1.6G (low pressurization, no gauge). FSM remained in STANDBY throughout the flight. **Fix for Atl-2:** threshold lowered to 1.2G.
+> **Note on parachute:** `LIFTOFF_G` is set to 2.5G. Actual peak was 1.6G — rocket was under-pressurized (no gauge available). FSM remained in STANDBY throughout the flight. **Fix for Atl-2:** proper pressurization with calibrated gauge.
 
 **Raw flight data:** [`data/flights/atl1_flight_20260601.csv`](data/flights/atl1_flight_20260601.csv)
 
@@ -100,7 +100,7 @@ USB-C ──► HW-373 ──► LiPo 3.7V ──► MT3608 ──► 5V ──�
 ## Flight State Machine
 
 ```
-              gForce ≥ 1.2G (4 consecutive)
+              gForce ≥ 2.5G (4 consecutive)
 ┌──────────┐ ────────────────────────────► ┌──────────┐
 │ STANDBY  │                               │  ASCENT  │
 └──────────┘                               └──────────┘
@@ -129,7 +129,7 @@ USB-C ──► HW-373 ──► LiPo 3.7V ──► MT3608 ──► 5V ──�
 | `STANDBY` | 0 | Boot | Transmit, log, wait for liftoff |
 | `ARMED` | 1 | *(future — remote arm)* | — |
 | `IGNITION` | 2 | *(future)* | — |
-| `ASCENT` | 3 | gForce ≥ 1.2G × 4 | Track maxAltitude, evaluate apogee |
+| `ASCENT` | 3 | gForce ≥ 2.5G × 4 | Track maxAltitude, evaluate apogee |
 | `APOGEE` | 4 | Triple-redundant trigger | `servo.write(90)` |
 | `DESCENT` | 5 | Post-apogee | Monitor alt, log |
 | `LANDING` | 6 | alt < 0.75 m | Close log · disable WiFi |
@@ -253,9 +253,8 @@ Atl-Flight_Computer/
 ### Pending — Atl-2
 | Item | Priority |
 |---|---|
-| Lower `LIFTOFF_G` to 1.2G (1.6G measured on Atl-1) | 🔴 High |
+| Proper pressurization with gauge (Atl-1 under-pressurized → 1.6G, threshold 2.5G) | ✅ Gauge acquired |
 | Verify CG/CP with electronics in OpenRocket (tumble at apogee) | 🔴 High |
-| Pressure gauge for launch | 🔴 High |
 | Replace BMP280 → MS5611 (±0.1m vs ±8m) | 🟡 Medium |
 | A/B EMI bench experiment (10 reps × 2 configs) | 📄 Paper |
 
