@@ -3,56 +3,56 @@ import io
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# 1. Leer y limpiar el archivo de telemetría original
-lineas_limpias = []
+# First, clean the raw telemetry data from the serial monitor
+clean_lines = []
 with open('atl1_vuelo.csv', 'r') as f:
-    for linea in f:
-        # Remover el prefijo del Monitor Serie "HH:MM:SS.xxx -> "
-        match = re.match(r'^.*?\s+->\s+(.*)$', linea)
+    for line in f:
+        # Get rid of the timestamp prefix (HH:MM:SS.xxx ->)
+        match = re.match(r'^.*?\s+->\s+(.*)$', line)
         if match:
-            contenido = match.group(1).strip()
-            # Ignorar encabezados de archivo internos o líneas vacías
-            if contenido.startswith('===') or not contenido:
+            content = match.group(1).strip()
+            # Skip empty lines or the internal file headers
+            if content.startswith('===') or not content:
                 continue
-            lineas_limpias.append(contenido)
+            clean_lines.append(content)
 
-# 2. Convertir a un DataFrame de Pandas
-csv_limpio = '\n'.join(lineas_limpias)
-df = pd.read_csv(io.StringIO(csv_limpio))
+# Load everything into a pandas dataframe
+csv_data = '\n'.join(clean_lines)
+df = pd.read_csv(io.StringIO(csv_data))
 
-# Convertir el tiempo de milisegundos a segundos para una lectura más fácil
+# Convert time to seconds to make the plots easier to read
 df['t_s'] = df['t_ms'] / 1000.0
 
-# 3. Crear las gráficas de telemetría
+# Setup the 2x2 grid for the plots
 fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharex=True)
 
-# Panel 1: Altitud
+# Altitude plot
 axes[0, 0].plot(df['t_s'], df['alt_m'], color='blue', linewidth=2)
-axes[0, 0].set_title('Altitud vs Tiempo')
-axes[0, 0].set_ylabel('Altitud (m)')
+axes[0, 0].set_title('Altitude vs Time')
+axes[0, 0].set_ylabel('Altitude (m)')
 axes[0, 0].grid(True)
 
-# Panel 2: Velocidad
+# Velocity plot
 axes[0, 1].plot(df['t_s'], df['vel_ms'], color='green', linewidth=2)
-axes[0, 1].set_title('Velocidad vs Tiempo')
-axes[0, 1].set_ylabel('Velocidad (m/s)')
+axes[0, 1].set_title('Velocity vs Time')
+axes[0, 1].set_ylabel('Velocity (m/s)')
 axes[0, 1].grid(True)
 
-# Panel 3: Aceleración
+# Acceleration plot
 axes[1, 0].plot(df['t_s'], df['accel_G'], color='red', linewidth=2)
-axes[1, 0].set_title('Aceleración vs Tiempo')
-axes[1, 0].set_xlabel('Tiempo (s)')
-axes[1, 0].set_ylabel('Aceleración (G)')
+axes[1, 0].set_title('Acceleration vs Time')
+axes[1, 0].set_xlabel('Time (s)')
+axes[1, 0].set_ylabel('Acceleration (G)')
 axes[1, 0].grid(True)
 
-# Panel 4: Presión Barométrica
+# Barometric pressure plot
 axes[1, 1].plot(df['t_s'], df['pressure_hPa'], color='purple', linewidth=2)
-axes[1, 1].set_title('Presión vs Tiempo')
-axes[1, 1].set_xlabel('Tiempo (s)')
-axes[1, 1].set_ylabel('Presión (hPa)')
+axes[1, 1].set_title('Pressure vs Time')
+axes[1, 1].set_xlabel('Time (s)')
+axes[1, 1].set_ylabel('Pressure (hPa)')
 axes[1, 1].grid(True)
 
 plt.tight_layout()
-# Guardar la gráfica en un archivo de imagen
+# Save the final figure
 plt.savefig('telemetria_vuelo.png', dpi=300)
-print("¡Gráfica generada y guardada como 'telemetria_vuelo.png'!")
+print("Plot generated and saved as 'telemetria_vuelo.png'!")
