@@ -4,20 +4,20 @@
 > Real-time telemetry · Triple-redundant apogee detection · Wi-Fi ground station · 7-state flight FSM · Onboard LittleFS black-box logging
 
 [![Status](https://img.shields.io/badge/status-First%20Flight%20Complete-brightgreen)](https://github.com/DonJechu/Atl-I_Flight-Computer)
-[![Platform](https://img.shields.io/badge/platform-ESP32--C3-blue)](https://www.espressif.com/)
+[![Platform](https://img.shields.io/badge/platform-ESP32%20DevKit-blue)](https://www.espressif.com/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Research](https://img.shields.io/badge/research-EMI%20Mitigation%20%2F%20Avionics-purple)](docs/research/)
+[![Research](https://img.shields.io/badge/research-EMI%20Characterization%20%2F%20Avionics-purple)](#research-context)
 
 ---
 
 ## Overview
 
-**Atl-1** is a flight computer for water-powered PET bottle rockets. It is the hardware validation platform for ongoing research into **EMI mitigation in compact low-cost avionics**, comparing shielded vs. unshielded configurations under real flight conditions.
+**Atl-1** is a flight computer for water-powered PET bottle rockets. It is the hardware validation platform for ongoing research into **replicable low-cost EMI characterization methodology for student avionics** — quantifying the effect of conducted and radiated noise sources on I²C sensors using a factorial 2×2 experimental design with A/A validation.
 
 - Real-time telemetry over Wi-Fi WebSocket at 10 Hz
 - Triple-redundant apogee detection (velocity zero-crossing + altitude drop + safety timeout)
 - Hardware IIR pressure filtering on BMP280 to suppress aerodynamic noise
-- Parachute deployment via servo at confirmed apogee
+- Passive gravity parachute recovery on the flight-1 build — servo-based deployment logic is present in firmware, but the servo was omitted to save mass (see Hardware)
 - Onboard black-box logging to flash via LittleFS — survives WiFi loss
 
 > **Status:** First instrumented flight completed — **June 1, 2026, Veracruz, Mexico.**
@@ -42,7 +42,7 @@
 
 > **Note on parachute:** `LIFTOFF_G` is set to 2.5G. Actual peak was 1.6G — rocket was under-pressurized (no gauge available). FSM remained in STANDBY throughout the flight. **Fix for Atl-2:** proper pressurization with calibrated gauge.
 
-**Raw flight data:** [`data/flights/atl1_flight_20260601.csv`](data/flights/atl1_flight_20260601.csv)
+**Raw flight data:** [`flights/atl1_flight_20260601.csv`](flights/atl1_flight_20260601.csv)
 
 ![Flight Data](media/Prototype%20Gallery/atl1_flight1_analysis.png)
 ![Atl-1 in flight](media/Prototype%20Gallery/atl1_flight_vid.gif)
@@ -52,20 +52,7 @@
 
 ## Research Context
 
-Experimental platform for a paper on **EMI mitigation in compact low-cost avionics** — to be submitted to IEEE Latin America Transactions.
-
-**Hypothesis:** *"EMI mitigation techniques (twisted pairs, star ground, LC filtering, spatial separation) significantly reduce I²C sensor degradation in compact ESP32-based avionics."*
-
-| Config A — Unmitigated | Config B — Mitigated |
-|---|---|
-| Parallel untwisted cables | Twisted pairs on all signal lines |
-| Daisy-chain ground | Star ground |
-| No LC filter on MT3608 | LC filter (47µH + 100µF) post-boost converter |
-| No decoupling caps | 100nF + 10µF per sensor node |
-
-Metrics: IMU RMS noise · I²C packet loss rate · barometric altitude drift · servo EMI events
-
-> Claims are limited to measured deltas between configurations — not theoretical validation of electromagnetic models.
+Atl-1 also serves as the flight demonstrator for an ongoing study on EMI behavior in compact low-cost avionics. The experimental design, dataset, and results are in preparation and will be released together with the publication.
 
 ---
 
@@ -73,13 +60,13 @@ Metrics: IMU RMS noise · I²C packet loss rate · barometric altitude drift · 
 
 | Component | Part | Notes |
 |---|---|---|
-| Microcontroller | ESP32-C3 Super Mini (USB-C) | Wi-Fi AP, WebSocket server |
+| Microcontroller | ESP32 DevKit (standard) | Wi-Fi AP, WebSocket server |
 | IMU | GY-521 module — chip: **MPU-6500** (WHO_AM_I = 0x70) | ±16G / ±2000°/s — see library patch below |
 | Barometer | BMP280 (0x76) | Hardware IIR FILTER_X16 enabled |
 | Power Boost | MT3608 DC-DC step-up | LiPo 3.7V → 5V |
 | Battery Charger | HW-373 (TP4056 + DW01) | USB-C charging with simultaneous load support |
 | Battery | LiPo 1S — 3.7V / 1200 mAh | Minimum flight voltage: 3.0V |
-| Actuator | Servo SG90 (GPIO 13) | Parachute deployment |
+| Actuator | *(none on flight-1)* — SG90 on GPIO 13 is **firmware-defined only** | Flight-1 flew **passive gravity recovery**; physical servo omitted to save mass — planned for Atl-2 |
 | Switch | SPDT (GPIO 10) | Master power |
 | Buzzer | Piezoelectric active (GPIO 3) | State audio feedback |
 
@@ -87,13 +74,15 @@ Metrics: IMU RMS noise · I²C packet loss rate · barometric altitude drift · 
 
 **Power path:**
 ```
-USB-C ──► HW-373 ──► LiPo 3.7V ──► MT3608 ──► 5V ──► ESP32-C3
-                                              └──► 3.3V LDO ──► Sensors
+USB-C ──► HW-373 ──► LiPo 3.7V ──► MT3608 ──► 5V ──► ESP32 DevKit (5V pin)
+                                                      └──► DevKit onboard LDO ──► 3V3 ──► Sensors
 ```
+
+> **As-built decoupling:** one electrolytic cap at the MT3608 VOUT and one ceramic cap at the sensor supply. **Atl-1 has no LC filter** — the LC filter belongs to the bench experiment's noisy config, not this flight build.
 
 > WiFi is disabled on LANDING to reduce idle current from ~180mA to ~20mA.
 
-**Avionics Bay design history (v1 → v4):** [`docs/avionics_bay_evolution.md`](docs/avionics_bay_evolution.md)
+**Avionics Bay design history (v1 → v4):** [`docs/docs_avionics_bay_evolution.md`](docs/docs_avionics_bay_evolution.md)
 
 ---
 
@@ -133,6 +122,8 @@ USB-C ──► HW-373 ──► LiPo 3.7V ──► MT3608 ──► 5V ──�
 | `APOGEE` | 4 | Triple-redundant trigger | `servo.write(90)` |
 | `DESCENT` | 5 | Post-apogee | Monitor alt, log |
 | `LANDING` | 6 | alt < 0.75 m | Close log · disable WiFi |
+
+> **Recovery, as-built:** the FSM executes `servo.write(90)` at apogee, but the **flight-1 build has no servo installed** — recovery is passive gravity. Servo-actuated deployment is the original design and the planned path for Atl-2.
 
 ---
 
@@ -199,7 +190,7 @@ if (chip_id.read() != MPU6050_DEVICE_ID && chip_id.read() != 0x70) {
 
 ### Flash Settings
 
-- **Board:** ESP32C3 Dev Module
+- **Board:** ESP32 Dev Module  *(classic ESP32 DevKit — confirm against your Arduino IDE selection)*
 - **Partition Scheme:** `Default 4MB with spiffs (1.2MB App/OTA, 1.5MB SPIFFS)` ← required for LittleFS
 - **Baud:** 115200
 
@@ -211,7 +202,7 @@ if (chip_id.read() != MPU6050_DEVICE_ID && chip_id.read() != 0x70) {
 - [ ] `LIST` via Serial → confirm new `/flight_N.csv` created
 - [ ] Ground station connected — altitude reads near 0 m
 - [ ] Only **one browser tab** open (multiple clients = duplicate CSV rows)
-- [ ] Servo confirmed at 0° (parachute closed)
+- [ ] Parachute packed for passive gravity deployment *(no servo on flight-1 build)*
 - [ ] LiPo at 4.2V (HW-373 blue LED solid)
 - [ ] Cap and pressurize **after** READY confirmation
 
@@ -220,20 +211,22 @@ if (chip_id.read() != MPU6050_DEVICE_ID && chip_id.read() != 0x70) {
 ## Repository Structure
 
 ```
-Atl-Flight_Computer/
+Atl-I_Flight-Computer/
 ├── firmware/
-│   └── hidrorocket_v3.ino
-├── data/flights/
-│   └── atl1_flight_20260601.csv
-├── analysis/
+│   └── HydroRocket.ino
+├── flights/
+│   ├── atl1_flight_20260601.csv
 │   └── graphics.py
 ├── hardware/
-│   └── Schematic_HidroRocket_v0_2026-04-26.pdf
+│   ├── Schematic_HidroRocket_v0_2026-04-20.pdf
+│   ├── Schematic_HidroRocket_v0_2026-04-26.pdf
+│   └── Schematic_HidroRocket_v0_2026-04-26-(actual).pdf
 ├── mechanical/
-│   └── AvionicsBay_v4.stl
+│   ├── AvionicsBay_v4.1.0.1.stl
+│   └── archive/
 ├── docs/
-│   └── avionics_bay_evolution.md
-├── media/
+│   └── docs_avionics_bay_evolution.md
+├── media/Prototype Gallery/
 └── README.md
 ```
 
@@ -256,7 +249,7 @@ Atl-Flight_Computer/
 | Proper pressurization with gauge (Atl-1 under-pressurized → 1.6G, threshold 2.5G) | ✅ Gauge acquired |
 | Verify CG/CP with electronics in OpenRocket (tumble at apogee) | 🔴 High |
 | Replace BMP280 → MS5611 (±0.1m vs ±8m) | 🟡 Medium |
-| A/B EMI bench experiment (10 reps × 2 configs) | 📄 Paper |
+| EMI characterization — factorial 2×2 bench experiment (4 cells × 10 reps, A/A validation) | 📄 Paper |
 
 ---
 
@@ -267,4 +260,4 @@ Mechatronics Engineering — IEST Anáhuac, Tamaulipas
 Founder — Vértice Labs Research Program  
 [github.com/DonJechu](https://github.com/DonJechu)
 
-*Atl-1 is the validation platform for experimental research on EMI mitigation in compact low-cost avionics. Paper in preparation for IEEE Latin America Transactions.*
+*Atl-1 is the flight validation platform for experimental research on EMI characterization methodology in compact low-cost avionics. Paper in preparation for IEEE regional conference.*
